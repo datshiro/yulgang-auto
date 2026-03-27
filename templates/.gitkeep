@@ -1,0 +1,10 @@
+# Place template images here (captured from the Mac game):
+# - inventory_button.png
+# - quick_sell_button.png
+# - quick_sell_confirm_button.png
+# - close_button.png
+# - quest_button.png
+# - quest_accept_button.png
+# - quest_complete_button.png
+#
+# Use screencapture or a small script to crop UI regions as PNG (40x40 to 80x80 px).
