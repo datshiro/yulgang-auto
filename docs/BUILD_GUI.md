@@ -12,6 +12,17 @@ source venv/bin/activate
 python -m gui
 ```
 
+### `ModuleNotFoundError: No module named '_tkinter'` (macOS + Homebrew Python)
+
+Homebrew’s `python@3.x` does not include Tk until you add the matching bottle:
+
+```bash
+brew install python-tk@3.13   # use 3.12 / 3.14 etc. to match `python3 --version`
+python3 -c "import tkinter"   # should print nothing if OK
+```
+
+Your virtualenv uses the same interpreter, so after this install you usually **do not** need to recreate `venv`. If it still fails, recreate the venv and `pip install -r requirements.txt` again.
+
 ## Build `YulangADB.app` with PyInstaller
 
 ```bash
