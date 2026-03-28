@@ -487,6 +487,8 @@ cd /Users/lap16932/personal/yulangv2 && source venv/bin/activate && python -m gu
 - Create: `yulang_gui.spec`
 - Create or modify: `docs/BUILD_GUI.md`
 
+**Follow-up (acceptance + hardening):** After Task 8 basics, execute [2026-03-28-pyinstaller-macos-gui-distribution-plan.md](./2026-03-28-pyinstaller-macos-gui-distribution-plan.md) (Tasks D1–D6) against [2026-03-28-pyinstaller-macos-gui-distribution-spec.md](../specs/2026-03-28-pyinstaller-macos-gui-distribution-spec.md).
+
 **Datas:** Include entire `templates/adb` directory. PyInstaller one-folder or one-file — **one-folder** (`COLLECT`) is easier for large cv2.
 
 **Hidden imports:** Often need `cv2`, `PIL`, `pyobjc` frameworks — follow PyInstaller warnings from a trial build.
@@ -520,7 +522,7 @@ a = Analysis(
 ```bash
 pip install pyinstaller
 pyinstaller yulang_gui.spec
-open dist/YulangGUI/YulangGUI.app   # name per spec
+open dist/YulangADB.app
 ```
 
 - [ ] **Step 3: Commit** — `docs: PyInstaller spec and frozen template path`
