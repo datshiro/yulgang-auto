@@ -83,6 +83,13 @@ pyinstaller yulang_gui.spec
 
 ## Verification checklist (acceptance)
 
+**Automated (CI / pytest):**
+
+- `tests/test_frozen_project_root.py` — `_get_project_root()` uses `sys._MEIPASS` when frozen; falls back correctly when `_MEIPASS` is unset.
+- `tests/test_adb_check.py` — `adb_available()` returns actionable text when `adb` is missing from PATH.
+
+**Manual (macOS, after `pyinstaller yulang_gui.spec`):**
+
 - [ ] `YulangADB.app` launches with **no Terminal window**.
 - [ ] Main window appears; ADB refresh / run paths execute without **“template not found”** errors for bundled `templates/adb` assets.
 - [ ] With `adb` on PATH and devices connected, a representative action completes as it does from CLI with the same config export.

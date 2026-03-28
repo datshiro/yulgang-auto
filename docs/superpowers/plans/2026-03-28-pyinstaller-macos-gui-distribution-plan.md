@@ -92,13 +92,13 @@
 
 **Objective:** All items in distribution spec §Verification checklist are satisfied.
 
-- [ ] `YulangADB.app` launches **without** a Terminal window. *(CI/agent: run locally with `open dist/YulangADB.app`.)*
+- [ ] `YulangADB.app` launches **without** a Terminal window. *(Manual: `open dist/YulangADB.app`.)*
 
-- [ ] Template matching works for bundled **`templates/adb`** (no missing-file errors on representative runs).
+- [ ] Template matching works for bundled **`templates/adb`** (no missing-file errors on representative runs). *(Manual GUI run; automated: `tests/test_frozen_project_root.py` covers bundle root resolution.)*
 
 - [ ] With **`adb`** available, behavior matches CLI for the **same** exported config + action (spot-check).
 
-- [ ] With **`adb`** missing/unusable, user-visible **clear** error path (not silent failure). *(Code path: `gui/adb_check.adb_available` returns actionable strings.)*
+- [x] With **`adb`** missing/unusable, user-visible **clear** error path (not silent failure). *(Covered by `tests/test_adb_check.py` + `gui/adb_check.py`; confirm banner/UI wiring manually once.)*
 
 - [x] **Commit** (suggested message): `build: verify PyInstaller YulangADB.app distribution` — include any spec/hiddenimports/doc fixes in the same or follow-up commit.
 
