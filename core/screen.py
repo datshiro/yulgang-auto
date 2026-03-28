@@ -282,10 +282,12 @@ def click_if_found(
             final_x = int((center_x + offset_x) * scale_x)
             final_y = int((center_y + offset_y) * scale_y)
 
-        backend.click(final_x, final_y, click_delay=click_delay)
-
-        print(f"[CLICKED] {path.name} at ({final_x}, {final_y}) | confidence={max_val:.3f}")
-        return True
+        clicked = backend.click(final_x, final_y, click_delay=click_delay)
+        if clicked:
+            print(f"[CLICKED] {path.name} at ({final_x}, {final_y}) | confidence={max_val:.3f}")
+        else:
+            print(f"[CLICK FAILED] {path.name} at ({final_x}, {final_y}) | all retries exhausted")
+        return clicked
 
     # Get best confidence for debug output
     best_match = _match_template(
@@ -325,5 +327,4 @@ def click_anywhere(click_delay: float = 0.05) -> bool:
         final_x = int(center_x * scale_x)
         final_y = int(center_y * scale_y)
 
-    backend.click(final_x, final_y, click_delay=click_delay)
-    return True
+    return backend.click(final_x, final_y, click_delay=click_delay)
