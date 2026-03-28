@@ -8,6 +8,7 @@ Uses backend abstraction for capture and click.
 from __future__ import annotations
 
 import random
+import sys
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -65,7 +66,11 @@ def _get_screenshot_bgr() -> tuple[np.ndarray, bool]:
 
 
 def _get_project_root() -> Path:
-    """Return project root (parent of core/)."""
+    """Return project root (parent of core/). When frozen (PyInstaller), use the bundle directory."""
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass)
     return Path(__file__).resolve().parent.parent
 
 

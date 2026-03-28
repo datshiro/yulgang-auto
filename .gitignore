@@ -31,6 +31,7 @@ MANIFEST
 #  before PyInstaller builds the exe, so you don't need to check them into git
 *.manifest
 *.spec
+!yulang_gui.spec
 
 # Installer logs
 pip-log.txt
