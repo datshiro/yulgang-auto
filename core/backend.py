@@ -18,6 +18,22 @@ import pyautogui
 # PyAutoGUI adds 0.1s PAUSE after every action by default. Reduce for faster automation.
 pyautogui.PAUSE = 0.02
 
+# ADB command retry configuration
+_ADB_CMD_RETRIES = 3
+_ADB_RETRY_DELAY = 0.5  # seconds between retries
+
+
+def _ping_device(device: str) -> None:
+    """Run adb get-state to nudge a stalled connection. Result is ignored."""
+    try:
+        subprocess.run(
+            ["adb", "-s", device, "get-state"],
+            capture_output=True,
+            timeout=3,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
 
 class Backend(Protocol):
     """Protocol for capture and click backends."""
@@ -130,22 +146,26 @@ class ADBBackend:
         return (img, False)
 
     def _capture_exec_out(self) -> np.ndarray | None:
-        """Capture via adb exec-out (fast)."""
-        try:
-            result = subprocess.run(
-                ["adb", "-s", self._device, "exec-out", "screencap", "-p"],
-                capture_output=True,
-                timeout=15,
-            )
-            if result.returncode != 0:
-                return None
-            raw = result.stdout.replace(b"\r\n", b"\n").replace(b"\r", b"")
-            if len(raw) < 100:
-                return None
-            nparr = np.frombuffer(raw, np.uint8)
-            return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            return None
+        """Capture via adb exec-out (fast). Retries on transient failures."""
+        for attempt in range(_ADB_CMD_RETRIES):
+            try:
+                result = subprocess.run(
+                    ["adb", "-s", self._device, "exec-out", "screencap", "-p"],
+                    capture_output=True,
+                    timeout=15,
+                )
+                if result.returncode == 0:
+                    raw = result.stdout
+                    if len(raw) >= 100:
+                        img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+                        if img is not None:
+                            return img
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+            if attempt < _ADB_CMD_RETRIES - 1:
+                _ping_device(self._device)
+                time.sleep(_ADB_RETRY_DELAY)
+        return None
 
     def _capture_pull(self) -> np.ndarray | None:
         """Capture via adb shell + pull (fallback for BlueStacks)."""
@@ -179,17 +199,24 @@ class ADBBackend:
             return None
 
     def click(self, x: int, y: int, click_delay: float = 0.05) -> bool:
-        try:
-            result = subprocess.run(
-                ["adb", "-s", self._device, "shell", "input", "tap", str(x), str(y)],
-                capture_output=True,
-                timeout=5,
-            )
-            if result.returncode == 0 and click_delay > 0:
-                time.sleep(click_delay)
-            return result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            return False
+        """Tap at (x, y) via adb. Retries on transient failures."""
+        for attempt in range(_ADB_CMD_RETRIES):
+            try:
+                result = subprocess.run(
+                    ["adb", "-s", self._device, "shell", "input", "tap", str(x), str(y)],
+                    capture_output=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    if click_delay > 0:
+                        time.sleep(click_delay)
+                    return True
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+            if attempt < _ADB_CMD_RETRIES - 1:
+                _ping_device(self._device)
+                time.sleep(_ADB_RETRY_DELAY)
+        return False
 
 
 def get_adb_devices() -> list[tuple[str, str]]:
