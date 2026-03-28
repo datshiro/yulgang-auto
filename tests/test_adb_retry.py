@@ -25,6 +25,11 @@ class TestPingDevice:
         with patch("core.backend.subprocess.run", side_effect=subprocess.TimeoutExpired("adb", 3)):
             _ping_device("emulator-5554")  # must not raise
 
+    def test_ignores_file_not_found(self):
+        """_ping_device does not raise when adb is not on PATH."""
+        with patch("core.backend.subprocess.run", side_effect=FileNotFoundError):
+            _ping_device("emulator-5554")  # must not raise
+
 
 class TestCaptureExecOutRetry:
     def _make_valid_png(self) -> bytes:
@@ -59,11 +64,11 @@ class TestCaptureExecOutRetry:
         with patch("core.backend.subprocess.run") as mock_run, \
              patch("core.backend._ping_device") as mock_ping, \
              patch("core.backend.time.sleep"):
-            mock_run.side_effect = [fail, fail, success]
+            mock_run.side_effect = [fail] * (_ADB_CMD_RETRIES - 1) + [success]
             result = backend._capture_exec_out()
 
         assert result is not None
-        assert mock_ping.call_count == 2  # pinged before each retry
+        assert mock_ping.call_count == _ADB_CMD_RETRIES - 1
 
     def test_returns_none_after_all_retries_exhausted(self):
         """Returns None when all retries fail."""
@@ -79,6 +84,23 @@ class TestCaptureExecOutRetry:
 
         assert result is None
         assert mock_run.call_count == _ADB_CMD_RETRIES
+
+
+class TestCaptureFallback:
+    def test_falls_through_to_capture_pull_on_exhaustion(self):
+        """capture() calls _capture_pull when _capture_exec_out exhausts retries."""
+        import numpy as np
+        backend = ADBBackend("emulator-5554")
+        dummy_img = np.zeros((10, 10, 3), dtype=np.uint8)
+
+        with patch.object(backend, "_capture_exec_out", return_value=None) as mock_exec, \
+             patch.object(backend, "_capture_pull", return_value=dummy_img) as mock_pull:
+            img, used_window = backend.capture()
+
+        mock_exec.assert_called_once()
+        mock_pull.assert_called_once()
+        assert img is dummy_img
+        assert used_window is False
 
 
 class TestClickRetry:
@@ -125,3 +147,15 @@ class TestClickRetry:
 
         assert result is False
         assert mock_run.call_count == _ADB_CMD_RETRIES
+
+    def test_no_sleep_when_click_delay_zero(self):
+        """click() does not sleep when click_delay=0."""
+        backend = ADBBackend("emulator-5554")
+
+        with patch("core.backend.subprocess.run") as mock_run, \
+             patch("core.backend.time.sleep") as mock_sleep:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = backend.click(100, 200, click_delay=0)
+
+        assert result is True
+        mock_sleep.assert_not_called()
