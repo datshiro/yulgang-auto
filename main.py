@@ -109,6 +109,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="JSON/YAML config file with multiple devices. See devices.example.json for schema.",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Extra logging for multi-device (--config) runs: per-device timing, adb output.",
+    )
     return parser.parse_args()
 
 
@@ -216,6 +221,7 @@ def _run_multi_device(args: argparse.Namespace) -> int:
         loop_interval=loop_interval,
         log=print,
         cancel_event=None,
+        verbose=args.verbose,
     )
 
 

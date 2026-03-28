@@ -43,11 +43,17 @@ def _run_for_device(
     action: str,
     threshold: float,
     stone_tags: list[str] | None,
+    *,
+    vlog: LogFn | None = None,
 ) -> tuple[str, bool, str]:
     """Run action for a single device. Returns (device_id, success, error_msg)."""
     device_id = device_config.get("serial")
     if not device_id:
         return ("<unknown>", False, "Missing 'serial' in device config")
+
+    t0 = time.monotonic()
+    if vlog:
+        vlog(f"[VERBOSE] {device_id}: start action={action!r} threshold={threshold}")
 
     try:
         set_backend(ADBBackend(device_id))
@@ -55,14 +61,24 @@ def _run_for_device(
 
         fn = _ACTION_HANDLERS.get(action)
         if not fn:
+            if vlog:
+                vlog(f"[VERBOSE] {device_id}: unknown action after {time.monotonic() - t0:.2f}s")
             return (device_id, False, f"Unknown action: {action}")
 
         if action in ("open_menu_chuyen_doi", "run_chuyen_doi_program"):
             success = fn(threshold=threshold, stone_tags=stone_tags)
         else:
             success = fn(threshold=threshold)
+        elapsed = time.monotonic() - t0
+        if vlog:
+            vlog(
+                f"[VERBOSE] {device_id}: finished ok={success} in {elapsed:.2f}s"
+                + ("" if success else " (action returned False)")
+            )
         return (device_id, success, "" if success else "Action returned False")
     except Exception as e:
+        if vlog:
+            vlog(f"[VERBOSE] {device_id}: exception after {time.monotonic() - t0:.2f}s: {e}")
         return (device_id, False, str(e))
 
 
@@ -75,25 +91,55 @@ def run_multi_device_adb(
     loop_interval: float,
     log: LogFn,
     cancel_event: threading.Event | None = None,
+    *,
+    verbose: bool = False,
 ) -> int:
     """
     Run ``action`` on each device dict (must include ``serial``).
 
     Returns 0 on full success, 1 if any device failed or no devices.
     If ``loop`` is True and ``cancel_event`` is set between iterations, returns 0.
+
+    When ``verbose`` is True, ``log`` receives per-device timing and adb start-server details.
     """
     if not devices:
         log("[ERROR] No devices in config")
         return 1
 
-    subprocess.run(["adb", "start-server"], capture_output=True, timeout=10)
+    vlog: LogFn | None = log if verbose else None
+    if verbose:
+        log(
+            f"[VERBOSE] Run: action={action!r} threshold={threshold} "
+            f"loop={loop} loop_interval={loop_interval}s devices={len(devices)} stones={stone_tags!r}"
+        )
+        for i, d in enumerate(devices):
+            log(f"[VERBOSE]   device[{i}]: serial={d.get('serial')!r}")
+
+    adb_result = subprocess.run(["adb", "start-server"], capture_output=True, timeout=10)
+    if verbose:
+        log(f"[VERBOSE] adb start-server rc={adb_result.returncode}")
+        if adb_result.stdout:
+            out = adb_result.stdout.decode(errors="replace").strip()
+            if out:
+                log(f"[VERBOSE] adb stdout: {out[:800]}")
+        if adb_result.stderr:
+            err = adb_result.stderr.decode(errors="replace").strip()
+            if err:
+                log(f"[VERBOSE] adb stderr: {err[:800]}")
 
     def run_once() -> int:
         log(f"[MULTI] Running '{action}' on {len(devices)} devices...")
         results: list[tuple[str, bool, str]] = []
         with ThreadPoolExecutor(max_workers=len(devices)) as executor:
             futures = {
-                executor.submit(_run_for_device, d, action, threshold, stone_tags): d
+                executor.submit(
+                    _run_for_device,
+                    d,
+                    action,
+                    threshold,
+                    stone_tags,
+                    vlog=vlog,
+                ): d
                 for d in devices
             }
             for future in as_completed(futures):

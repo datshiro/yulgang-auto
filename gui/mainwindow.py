@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import queue
 import threading
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import filedialog, messagebox, ttk, scrolledtext
 
 from core.backend import get_adb_devices
@@ -28,6 +31,37 @@ def _parse_stone_tags(stones_arg: str) -> list[str] | None:
     if not stones_arg or not stones_arg.strip():
         return None
     return [s.strip() for s in stones_arg.split(",") if s.strip()]
+
+
+class _LineQueueLogStream(io.TextIOBase):
+    """Send each printed line to the GUI log (used with redirect_stdout/stderr)."""
+
+    encoding = "utf-8"
+
+    def __init__(self, emit_line: Callable[[str], None]) -> None:
+        super().__init__()
+        self._emit = emit_line
+        self._buffer = ""
+
+    def write(self, s: str) -> int:  # type: ignore[override]
+        if not s:
+            return 0
+        self._buffer += str(s)
+        while True:
+            idx = self._buffer.find("\n")
+            if idx < 0:
+                break
+            line = self._buffer[:idx].rstrip("\r")
+            self._buffer = self._buffer[idx + 1 :]
+            if line:
+                self._emit(line)
+        return len(s)
+
+    def flush(self) -> None:
+        if self._buffer.strip():
+            self._emit(self._buffer.rstrip("\r\n"))
+        self._buffer = ""
+        super().flush()
 
 
 class _DeviceRow:
@@ -118,6 +152,8 @@ class YulangAdbApp(tk.Tk):
         ttk.Spinbox(row2, from_=1.0, to=3600.0, increment=1.0, textvariable=self._loop_interval, width=8).pack(
             side=tk.LEFT, padx=4
         )
+        self._verbose_log = tk.BooleanVar(value=True)
+        ttk.Checkbutton(row2, text="Verbose log", variable=self._verbose_log).pack(side=tk.LEFT, padx=(24, 0))
 
     def _build_actions_section(self) -> None:
         lf = ttk.Frame(self)
@@ -306,22 +342,44 @@ class YulangAdbApp(tk.Tk):
         loop = bool(self._loop.get())
         loop_interval = float(self._loop_interval.get())
         stone_tags = _parse_stone_tags(self._stones.get())
+        verbose = bool(self._verbose_log.get())
 
         def work() -> None:
             def log_fn(line: str) -> None:
                 self._log_queue.put(("log", line))
 
             try:
-                rc = run_multi_device_adb(
-                    devices=devices,
-                    action=action,
-                    threshold=threshold,
-                    stone_tags=stone_tags,
-                    loop=loop,
-                    loop_interval=loop_interval,
-                    log=log_fn,
-                    cancel_event=self._cancel,
+                stream = _LineQueueLogStream(log_fn)
+                ctx = (
+                    contextlib.redirect_stdout(stream),
+                    contextlib.redirect_stderr(stream),
                 )
+                if verbose:
+                    with ctx[0], ctx[1]:
+                        rc = run_multi_device_adb(
+                            devices=devices,
+                            action=action,
+                            threshold=threshold,
+                            stone_tags=stone_tags,
+                            loop=loop,
+                            loop_interval=loop_interval,
+                            log=log_fn,
+                            cancel_event=self._cancel,
+                            verbose=True,
+                        )
+                    stream.flush()
+                else:
+                    rc = run_multi_device_adb(
+                        devices=devices,
+                        action=action,
+                        threshold=threshold,
+                        stone_tags=stone_tags,
+                        loop=loop,
+                        loop_interval=loop_interval,
+                        log=log_fn,
+                        cancel_event=self._cancel,
+                        verbose=False,
+                    )
                 self._log_queue.put(("done", rc))
             except Exception as e:
                 self._log_queue.put(("log", f"[ERROR] {e}"))
