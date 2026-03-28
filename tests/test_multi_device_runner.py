@@ -5,8 +5,6 @@ import threading
 import time
 from unittest.mock import patch
 
-import pytest
-
 from core.multi_device_runner import run_multi_device_adb
 
 
