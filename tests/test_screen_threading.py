@@ -16,14 +16,14 @@ def test_backends_are_thread_isolated():
 
     barrier = threading.Barrier(2)
 
-    def run_thread(name, backend, other_backend):
+    def run_thread(name, backend):
         screen.set_backend(backend)
         barrier.wait()  # Both threads set their backend before either reads
         got = screen._get_backend()
         results[name] = got
 
-    t1 = threading.Thread(target=run_thread, args=("a", backend_a, backend_b))
-    t2 = threading.Thread(target=run_thread, args=("b", backend_b, backend_a))
+    t1 = threading.Thread(target=run_thread, args=("a", backend_a))
+    t2 = threading.Thread(target=run_thread, args=("b", backend_b))
     t1.start()
     t2.start()
     t1.join()

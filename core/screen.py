@@ -120,16 +120,16 @@ def get_stone_template_names() -> list[str]:
     """Return sorted list of template names in stones/ subdir (e.g. stones/thiem_1.png)."""
     root = _get_project_root()
     base = root / "templates"
-    _template_subdir = getattr(_thread_local, "template_subdir", None)
-    if _template_subdir:
-        stones_dir = base / _template_subdir / "stones"
+    template_subdir = getattr(_thread_local, "template_subdir", None)
+    if template_subdir:
+        stones_dir = base / template_subdir / "stones"
     else:
         stones_dir = base / "stones"
     if not stones_dir.is_dir():
         return []
     names = []
     for p in sorted(stones_dir.glob("*.png")):
-        rel = p.relative_to(base / _template_subdir if _template_subdir else base)
+        rel = p.relative_to(base / template_subdir if template_subdir else base)
         names.append(str(rel))
     return names
 
@@ -138,9 +138,9 @@ def resolve_template_path(template_name: str) -> Path:
     """Resolve template name to full path under templates/ (or templates/subdir/)."""
     root = _get_project_root()
     base = root / "templates"
-    _template_subdir = getattr(_thread_local, "template_subdir", None)
-    if _template_subdir:
-        subdir_path = base / _template_subdir / template_name
+    template_subdir = getattr(_thread_local, "template_subdir", None)
+    if template_subdir:
+        subdir_path = base / template_subdir / template_name
         if not subdir_path.suffix:
             subdir_path = subdir_path.with_suffix(".png")
         if subdir_path.exists():
