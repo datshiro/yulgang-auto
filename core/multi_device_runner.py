@@ -119,20 +119,24 @@ def run_multi_device_adb(
         log("[WARN] --loop works best with quick_sell, do_quest, or run_chuyen_doi_program")
 
     iteration = 0
-    while True:
-        if cancel_event is not None and cancel_event.is_set():
-            log(f"\n[LOOP] Stopped after {iteration} iteration(s).")
-            return 0
-        iteration += 1
-        log(f"[LOOP #{iteration}]")
-        rc = run_once()
-        if rc != 0:
-            return rc
-        log(f"[LOOP] Next run in {loop_interval}s")
-        end = time.monotonic() + loop_interval
-        while time.monotonic() < end:
+    try:
+        while True:
             if cancel_event is not None and cancel_event.is_set():
                 log(f"\n[LOOP] Stopped after {iteration} iteration(s).")
                 return 0
-            remaining = end - time.monotonic()
-            time.sleep(min(0.5, remaining) if remaining > 0 else 0)
+            iteration += 1
+            log(f"[LOOP #{iteration}]")
+            rc = run_once()
+            if rc != 0:
+                return rc
+            log(f"[LOOP] Next run in {loop_interval}s")
+            end = time.monotonic() + loop_interval
+            while time.monotonic() < end:
+                if cancel_event is not None and cancel_event.is_set():
+                    log(f"\n[LOOP] Stopped after {iteration} iteration(s).")
+                    return 0
+                remaining = end - time.monotonic()
+                time.sleep(min(0.5, remaining) if remaining > 0 else 0)
+    except KeyboardInterrupt:
+        log(f"\n[LOOP] Stopped after {iteration} iteration(s).")
+        return 0
