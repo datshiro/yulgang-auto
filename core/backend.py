@@ -147,6 +147,7 @@ class ADBBackend:
 
     def _capture_exec_out(self) -> np.ndarray | None:
         """Capture via adb exec-out (fast). Retries on transient failures."""
+        last_reason = "unknown"
         for attempt in range(_ADB_CMD_RETRIES):
             try:
                 result = subprocess.run(
@@ -160,11 +161,20 @@ class ADBBackend:
                         img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
                         if img is not None:
                             return img
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                pass
+                        last_reason = "imdecode returned None (corrupt PNG?)"
+                    else:
+                        last_reason = f"output too short ({len(raw)} bytes)"
+                else:
+                    stderr = result.stderr.decode(errors="replace").strip()
+                    last_reason = f"returncode={result.returncode}" + (f" ({stderr})" if stderr else "")
+            except FileNotFoundError:
+                last_reason = "adb not found on PATH"
+            except subprocess.TimeoutExpired:
+                last_reason = "adb timed out"
             if attempt < _ADB_CMD_RETRIES - 1:
                 _ping_device(self._device)
                 time.sleep(_ADB_RETRY_DELAY)
+        print(f"[ADB] {self._device}: exec-out failed after {_ADB_CMD_RETRIES} attempts — {last_reason}")
         return None
 
     def _capture_pull(self) -> np.ndarray | None:

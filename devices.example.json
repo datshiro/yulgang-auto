@@ -1,0 +1,9 @@
+{
+  "loop": true,
+  "loop_interval": 10,
+  "threshold": 0.75,
+  "devices": [
+    { "serial": "emulator-5554" },
+    { "serial": "emulator-5564" }
+  ]
+}
