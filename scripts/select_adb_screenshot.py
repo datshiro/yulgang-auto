@@ -53,6 +53,37 @@ def select_device(devices: list[str]) -> str | None:
         except ValueError:
             print("[ERROR] Invalid input. Enter a number or 'q'.")
 
+def capture_screenshot(serial: str, output_path: Path) -> bool:
+    """Captures screen via exec-out with fallback to pull."""
+    print(f"[INFO] Capturing screen from {serial}...")
+    
+    # Method 1: exec-out (fast)
+    try:
+        result = subprocess.run(
+            ["adb", "-s", serial, "exec-out", "screencap", "-p"],
+            capture_output=True,
+            timeout=15
+        )
+        if result.returncode == 0 and len(result.stdout) > 1000:
+            # Fix line endings if necessary (some older adb versions)
+            raw = result.stdout.replace(b"\r\n", b"\n").replace(b"\r", b"")
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(raw)
+            return True
+    except Exception as e:
+        print(f"[WARN] exec-out failed: {e}. Trying fallback...")
+
+    # Method 2: Fallback (shell + pull)
+    remote_path = "/sdcard/tmp_screencap.png"
+    try:
+        subprocess.run(["adb", "-s", serial, "shell", "screencap", "-p", remote_path], check=True)
+        subprocess.run(["adb", "-s", serial, "pull", remote_path, str(output_path)], check=True)
+        subprocess.run(["adb", "-s", serial, "shell", "rm", remote_path], check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] Capture failed: {e}")
+        return False
+
 if __name__ == "__main__":
     devs = ["dev1", "dev2"]
     selected = select_device(devs)
