@@ -56,6 +56,7 @@ def select_device(devices: list[str]) -> str | None:
 def capture_screenshot(serial: str, output_path: Path) -> bool:
     """Captures screen via exec-out with fallback to pull."""
     print(f"[INFO] Capturing screen from {serial}...")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Method 1: exec-out (fast)
     try:
@@ -67,7 +68,6 @@ def capture_screenshot(serial: str, output_path: Path) -> bool:
         if result.returncode == 0 and len(result.stdout) > 1000:
             # Fix line endings if necessary (some older adb versions)
             raw = result.stdout.replace(b"\r\n", b"\n").replace(b"\r", b"")
-            output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(raw)
             return True
     except Exception as e:
@@ -84,7 +84,29 @@ def capture_screenshot(serial: str, output_path: Path) -> bool:
         print(f"[ERROR] Capture failed: {e}")
         return False
 
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Interactively capture ADB screenshot")
+    parser.add_argument("-o", "--output", help="Output path for the screenshot")
+    args = parser.parse_args()
+
+    devices = get_devices()
+    serial = select_device(devices)
+    if not serial:
+        return 1
+    
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        root = Path(__file__).resolve().parent.parent
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = root / "screenshots" / f"adb_select_{ts}.png"
+
+    if capture_screenshot(serial, output_path):
+        print(f"[OK] Screenshot saved to: {output_path}")
+        return 0
+    else:
+        print("[ERROR] Failed to save screenshot.")
+        return 1
+
 if __name__ == "__main__":
-    devs = ["dev1", "dev2"]
-    selected = select_device(devs)
-    print(f"Selected: {selected}")
+    sys.exit(main())
