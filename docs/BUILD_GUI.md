@@ -25,12 +25,41 @@ Your virtualenv uses the same interpreter, so after this install you usually **d
 
 ## Build `YulangADB.app` with PyInstaller
 
+Install the freeze tool (same venv as the project):
+
 ```bash
-pip install pyinstaller
+source venv/bin/activate
+pip install -r requirements-dev.txt
+```
+
+From the repository root:
+
+```bash
 pyinstaller yulang_gui.spec
 ```
 
-Output: `dist/YulangADB.app`. Open it from Finder; if macOS blocks it, use **System Settings → Privacy & Security → Open Anyway** (or ad-hoc code-sign the bundle for your machine).
+**One-command clean rebuild** (activates `venv/`, wipes `build/` + `dist/`, runs PyInstaller):
+
+```bash
+./scripts/build_gui_app.sh
+```
+
+If templates or Python code in the bundle look stale, **always** do a clean rebuild before reporting bugs:
+
+```bash
+rm -rf build dist
+pyinstaller yulang_gui.spec
+```
+
+**Output:** `dist/YulangADB.app`. Open from Finder or `open dist/YulangADB.app`. If macOS blocks it, use **System Settings → Privacy & Security → Open Anyway**.
+
+**Ad-hoc code-sign (local only, not notarization)** sometimes reduces Gatekeeper friction:
+
+```bash
+codesign --force --deep --sign - dist/YulangADB.app
+```
+
+Full packaging requirements and acceptance checklist: [PyInstaller macOS GUI distribution spec](superpowers/specs/2026-03-28-pyinstaller-macos-gui-distribution-spec.md).
 
 Frozen builds resolve templates via `sys._MEIPASS` (see `core/screen.py` `_get_project_root()`). The spec bundles `templates/adb` into `templates/adb` inside the app.
 

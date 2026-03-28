@@ -14,7 +14,8 @@ a = Analysis(
     pathex=[str(ROOT)],
     binaries=[],
     datas=[(str(ROOT / "templates" / "adb"), "templates/adb")],
-    hiddenimports=["PIL._tkinter_finder"],
+    # cv2: PyInstaller often omits OpenCV; GUI + flows import it via core/screen.py.
+    hiddenimports=["PIL._tkinter_finder", "cv2"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

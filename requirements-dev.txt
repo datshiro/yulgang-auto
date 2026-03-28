@@ -1,0 +1,3 @@
+# Optional: pip install -r requirements-dev.txt (after requirements.txt)
+# Used to freeze YulangADB.app; see docs/BUILD_GUI.md.
+pyinstaller>=6.0
