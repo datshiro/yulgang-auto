@@ -8,6 +8,7 @@ Uses backend abstraction for capture and click.
 from __future__ import annotations
 
 import random
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,21 +18,20 @@ import numpy as np
 if TYPE_CHECKING:
     from core.backend import Backend
 
-# Set by main.py based on --mode
-_backend: Backend | None = None
-_template_subdir: str | None = None
+# Per-thread backend and template subdir — set by main.py based on --mode.
+# threading.local() ensures each worker thread in multi-device execution
+# has its own isolated backend; no cross-thread contamination.
+_thread_local = threading.local()
 
 
 def set_backend(backend: Backend) -> None:
-    """Set the active capture/click backend (Mac or ADB)."""
-    global _backend
-    _backend = backend
+    """Set the active capture/click backend (Mac or ADB) for this thread."""
+    _thread_local.backend = backend
 
 
 def set_template_subdir(subdir: str | None) -> None:
     """Set template subdir (e.g. 'adb') for mode-specific templates. None = default."""
-    global _template_subdir
-    _template_subdir = subdir
+    _thread_local.template_subdir = subdir
 
 
 def set_capture_context(window_id: int | None, game_app: str | None) -> None:
@@ -42,13 +42,14 @@ def set_capture_context(window_id: int | None, game_app: str | None) -> None:
 
 
 def _get_backend() -> Backend:
-    """Return active backend; create default MacBackend if none set."""
-    global _backend
-    if _backend is None:
+    """Return active backend for this thread; create default MacBackend if none set."""
+    backend = getattr(_thread_local, "backend", None)
+    if backend is None:
         from core.backend import MacBackend
 
-        _backend = MacBackend(window_id=None, game_app=None)
-    return _backend
+        backend = MacBackend(window_id=None, game_app=None)
+        _thread_local.backend = backend
+    return backend
 
 
 def _get_screenshot_bgr() -> tuple[np.ndarray, bool]:
@@ -119,6 +120,7 @@ def get_stone_template_names() -> list[str]:
     """Return sorted list of template names in stones/ subdir (e.g. stones/thiem_1.png)."""
     root = _get_project_root()
     base = root / "templates"
+    _template_subdir = getattr(_thread_local, "template_subdir", None)
     if _template_subdir:
         stones_dir = base / _template_subdir / "stones"
     else:
@@ -136,6 +138,7 @@ def resolve_template_path(template_name: str) -> Path:
     """Resolve template name to full path under templates/ (or templates/subdir/)."""
     root = _get_project_root()
     base = root / "templates"
+    _template_subdir = getattr(_thread_local, "template_subdir", None)
     if _template_subdir:
         subdir_path = base / _template_subdir / template_name
         if not subdir_path.suffix:
